@@ -1,3 +1,7 @@
+# cpp11bigwig 0.1.2
+
+* Fix parsing of bigBed end coordinates.
+  
 # cpp11bigwig 0.1.1
 
 * Sync with [libBigWig v0.4.8](https://github.com/dpryan79/libBigWig/releases/tag/0.4.8)

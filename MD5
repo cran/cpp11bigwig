@@ -1,11 +1,11 @@
-633469c2118da41982d6503568b2b5c8 *DESCRIPTION
+026e93e11d69421c3dbb536072aa81d1 *DESCRIPTION
 334b6103015ff5215873267c1ca1dee8 *LICENSE
 8ff6ab8bfe8439cd426b062a5b742b89 *NAMESPACE
-087c3caa6fc0f273a4d332b366a54d3d *NEWS.md
+8d93900c9f6d9eb538f6f7d64245e712 *NEWS.md
 569fe666d2ab11fe90d13e25f4e6bb2c *R/bigwig-package.R
 bbb980ec61d0025cd59e7f2925b51f61 *R/cpp11.R
-4e043d6a1acd017fbc6699d00afe71f5 *R/read.r
-b5bf2d4f14f1f17d46ff11596b284528 *README.md
+01643e6ba1d73f2c8acf4f0a682addc9 *R/read.r
+a86229c3c685aa2d8195fd685add99fd *README.md
 2d7729c2871fb20045c8c81be40b3a7f *inst/extdata/test.bb
 6f8267b5c650392452bc7f2162cd256d *inst/extdata/test.bg
 4334010ad1201a607cd7cefa49e7cc5c *inst/extdata/test.bw
@@ -15,7 +15,7 @@ e2efd74b18ad4a2f483c2e7657c52ab8 *man/read_bigwig.Rd
 2c8ecb8cb6b5d5d87c1c9033ae6509e1 *src/Makevars
 a46b4ce0d61083b4aa1e392a26ac6b5c *src/Makevars.win
 b2ff243064a90660a2c7e95b26ecd3be *src/cpp11.cpp
-2bbfd1ba34354484997eb87b2b3e1bc9 *src/cpp11bigwig.cpp
+51b48711f54c843a463519e2d49e9ec6 *src/cpp11bigwig.cpp
 dae1104329b85e2a18f9153c7c76d5d9 *src/libBigWig/LICENSE
 28590b76b7be5c622c4ba423bc0b5d02 *src/libBigWig/Makefile
 f4f132fa9c9db0f0871e39aa68e6be08 *src/libBigWig/bigWig.h
@@ -31,4 +31,4 @@ cab045f28838b17abfb6b32594bc0304 *tests/testthat.R
 6bc303c39fbd662fbeedcc74e062426f *tests/testthat/_snaps/read.md
 2d7729c2871fb20045c8c81be40b3a7f *tests/testthat/data/test.bb
 4334010ad1201a607cd7cefa49e7cc5c *tests/testthat/data/test.bw
-676640d9ba561b7d03f111c4497625f9 *tests/testthat/test-read.R
+85f10482bd3a7ea9b98ce7e20799dcb8 *tests/testthat/test-read.R
