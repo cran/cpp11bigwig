@@ -1,3 +1,7 @@
+# cpp11bigwig 0.1.3
+
+* bigBed columns are now automatically coerced based on autoSql types (#12)
+
 # cpp11bigwig 0.1.2
 
 * Fix parsing of bigBed end coordinates.
