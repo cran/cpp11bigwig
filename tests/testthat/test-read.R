@@ -28,6 +28,36 @@ test_that("results have expected shape", {
   expect_equal(nrow(res), 3)
 })
 
+test_that("as = 'Rle' returns a per-base run-length vector", {
+  bw <- test_path("data/test.bw")
+
+  # values are stored as 32-bit floats, so compare with tolerance
+  tol <- 1e-6
+
+  # windowed query: length equals end - start, gaps filled with 0
+  r <- read_bigwig(bw, chrom = "1", start = 0, end = 5, as = "Rle")
+  expect_s4_class(r, "Rle")
+  expect_equal(length(r), 5L)
+  expect_equal(as.numeric(r), c(0.1, 0.2, 0.3, 0, 0), tolerance = tol)
+
+  # uncovered bases inside the data range are also filled
+  r <- read_bigwig(bw, chrom = "1", start = 98, end = 103, as = "Rle")
+  expect_equal(as.numeric(r), c(0, 0, 1.4, 1.4, 1.4), tolerance = tol)
+
+  # fill = NA marks uncovered bases as missing
+  r <- read_bigwig(bw, chrom = "1", start = 0, end = 5, as = "Rle", fill = NA)
+  expect_equal(as.numeric(r), c(0.1, 0.2, 0.3, NA, NA), tolerance = tol)
+
+  # without an explicit window the Rle spans the data extent of the chrom
+  r <- read_bigwig(bw, chrom = "1", as = "Rle")
+  expect_equal(length(r), 151L)
+
+  # multiple chromosomes return a named RleList
+  rl <- read_bigwig(bw, as = "Rle")
+  expect_s4_class(rl, "RleList")
+  expect_equal(names(rl), c("1", "10"))
+})
+
 test_that("missing file causes error", {
   expect_snapshot_error(read_bigwig("missing.bw"))
 })
@@ -35,6 +65,59 @@ test_that("missing file causes error", {
 test_that("negative coords causes error", {
   expect_snapshot_error(read_bigwig(test_path("data/test.bw"), start = -1))
   expect_snapshot_error(read_bigwig(test_path("data/test.bw"), end = -1))
+})
+
+test_that("is_remote detects URLs", {
+  expect_true(is_remote("https://example.com/x.bw"))
+  expect_true(is_remote("http://example.com/x.bw"))
+  expect_true(is_remote("ftp://example.com/x.bw"))
+  expect_true(is_remote("HTTPS://EXAMPLE.COM/x.bw"))
+  expect_false(is_remote("/local/path/x.bw"))
+  expect_false(is_remote("x.bw"))
+})
+
+test_that("remote bigWig reads match local", {
+  skip_on_cran()
+  skip_if_not(bigwig_has_curl_cpp(), "built without libcurl")
+
+  url <- paste0(
+    "https://raw.githubusercontent.com/rnabioco/cpp11bigwig/",
+    "main/inst/extdata/test.bw"
+  )
+  local <- read_bigwig(system.file("extdata", "test.bw", package = "cpp11bigwig"))
+  # a network/remote-host failure should skip, not fail the suite
+  remote <- tryCatch(
+    read_bigwig(url),
+    error = function(e) skip(paste("remote fetch unavailable:", conditionMessage(e)))
+  )
+
+  expect_equal(remote, local)
+})
+
+test_that("remote bigWig larger than the read buffer reads a windowed range (#18)", {
+  # Regression test: the HTTP Range header was not being set, so servers
+  # returned the entire file. Files larger than the internal read buffer
+  # (1 << 17 bytes) overran it and crashed R or failed to open. This reads a
+  # small window from an 81 MB file, which only succeeds with working range
+  # requests (it must not download the whole file).
+  skip_on_cran()
+  skip_if_not(bigwig_has_curl_cpp(), "built without libcurl")
+
+  url <- "https://genome.ucsc.edu/goldenPath/help/examples/bigWigExample.bw"
+  remote <- tryCatch(
+    read_bigwig(url, chrom = "chr21", start = 33031597, end = 33041570),
+    error = function(e) skip(paste("remote fetch unavailable:", conditionMessage(e)))
+  )
+
+  expect_s3_class(remote, "tbl_df")
+  expect_true(nrow(remote) > 0)
+  # a windowed query must return only the window, not the whole 81 MB file
+  expect_true(all(remote$chrom == "chr21"))
+  expect_true(min(remote$start) >= 33031597)
+  expect_true(max(remote$end) <= 33041570)
+  # known values from this stable UCSC example file
+  expect_equal(remote$start[1], 33031597L)
+  expect_equal(remote$value[1], 40)
 })
 
 test_that("read_bigbed correctly parses interval coordinates", {
