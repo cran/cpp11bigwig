@@ -11,11 +11,17 @@ read_bigbed(bbfile, chrom = NULL, start = NULL, end = NULL)
 (\verb{http://}, \verb{https://}, \verb{ftp://}) are supported when the package was
 installed with libcurl available.}
 
-\item{chrom}{read data for specific chromosome}
+\item{chrom}{chromosome(s) to read. Either a character vector of
+chromosome names, or a \link[GenomicRanges:GRanges]{GenomicRanges::GRanges} of query regions (in
+which case \code{start}/\code{end} are ignored). As with \code{\link[=read_bigwig]{read_bigwig()}},
+\code{GRanges} 1-based coordinates are converted to bigBed's 0-based
+half-open coordinates.}
 
-\item{start}{start position for data}
+\item{start}{start position(s) for data. May be a vector describing
+several ranges, recycled against \code{chrom}/\code{end}.}
 
-\item{end}{end position for data}
+\item{end}{end position(s) for data. May be a vector describing
+several ranges, recycled against \code{chrom}/\code{start}.}
 }
 \value{
 \code{tibble}
@@ -33,6 +39,19 @@ bb <- system.file("extdata", "test.bb", package = "cpp11bigwig")
 read_bigbed(bb)
 
 read_bigbed(bb, chrom = "chr10")
+
+# query several chromosomes in one call
+read_bigbed(bb, chrom = c("chr1", "chr10"))
+
+# restrict each query to a window
+read_bigbed(bb, chrom = c("chr1", "chr10"), start = c(0, 0), end = c(5e6, 5e6))
+
+# pass a GRanges of regions; 1-based coords are converted automatically
+gr <- GenomicRanges::GRanges(
+  c("chr1", "chr10"),
+  IRanges::IRanges(start = 1, width = 1e7)
+)
+read_bigbed(bb, chrom = gr)
 
 }
 \seealso{

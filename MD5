@@ -1,10 +1,10 @@
-f25c003f1c1aefa3c0f7e5003d21f07f *DESCRIPTION
+b77fa659971fefd1d23ee02151701111 *DESCRIPTION
 334b6103015ff5215873267c1ca1dee8 *LICENSE
 eb26a864a5b533e98bf69962608104e0 *NAMESPACE
-a5c2d3c2586b59363f844ff6003d275b *NEWS.md
+e77c8694d1e1f5f8f574e7ad29c6ff10 *NEWS.md
 569fe666d2ab11fe90d13e25f4e6bb2c *R/bigwig-package.R
-c1f2250d32a9b17adb49964cf327b074 *R/cpp11.R
-98e51b3559c1ecac46e772da44914404 *R/read.r
+c543ee65b3afb4df92b182be2bdbfdaa *R/cpp11.R
+af1663842f48a9acf07c8a067ceab751 *R/read.r
 230b84216bbde514345b99a9ba9c4622 *README.md
 170e1e288da6773c742f11c8fdc2aa37 *cleanup
 7114b5f89ec22c18b3048b59614d09d6 *configure
@@ -13,12 +13,12 @@ c1f2250d32a9b17adb49964cf327b074 *R/cpp11.R
 6f8267b5c650392452bc7f2162cd256d *inst/extdata/test.bg
 4334010ad1201a607cd7cefa49e7cc5c *inst/extdata/test.bw
 7a5574aaee06d0b66e173f09cfbccf85 *man/cpp11bigwig-package.Rd
-b337e2d989763fb24d28811f2efab66c *man/read_bigbed.Rd
-832409618137ba263234825462806360 *man/read_bigwig.Rd
+06317e97fc35d61695db4e0ec906ac82 *man/read_bigbed.Rd
+091a268cdea64ea76cc85d8b12b57ded *man/read_bigwig.Rd
 fb18d7af881e1887effc04c6ce013cf5 *src/Makevars.in
 fb18d7af881e1887effc04c6ce013cf5 *src/Makevars.win.in
-4b8158b14217f7a044cc1dbd1d7666a4 *src/cpp11.cpp
-2bfa590f7cbe194497bef096b73d665d *src/cpp11bigwig.cpp
+44130e78058da755b6618f8f09e589bd *src/cpp11.cpp
+09ecf1c0c4c84b9aceb69176ecf63da6 *src/cpp11bigwig.cpp
 dae1104329b85e2a18f9153c7c76d5d9 *src/libBigWig/LICENSE
 1caec3e8805bb1adbad2abcef793f1bf *src/libBigWig/Makefile
 f4f132fa9c9db0f0871e39aa68e6be08 *src/libBigWig/bigWig.h
@@ -26,7 +26,7 @@ f4f132fa9c9db0f0871e39aa68e6be08 *src/libBigWig/bigWig.h
 df49e3cb82e1e58266ba2c0d270f0e83 *src/libBigWig/bwCommon.h
 fe3da968e50b2046bb5bb1a5bcf8bfd7 *src/libBigWig/bwRead.c
 83cfb20634d1016d8b16fec14504672b *src/libBigWig/bwStats.c
-5274a22943a5bb7edad970e444265678 *src/libBigWig/bwValues.c
+ef249b4463860c3e9d80c30bae974c19 *src/libBigWig/bwValues.c
 c9bedc075720b9b7c9ab41b65ed88b42 *src/libBigWig/bwValues.h
 5862c5682493347869c4726b3c5922c6 *src/libBigWig/bwWrite.c
 adcb6ad75e982222d207cedd0a5cf84a *src/libBigWig/io.c
@@ -34,4 +34,5 @@ cab045f28838b17abfb6b32594bc0304 *tests/testthat.R
 6bc303c39fbd662fbeedcc74e062426f *tests/testthat/_snaps/read.md
 2d7729c2871fb20045c8c81be40b3a7f *tests/testthat/data/test.bb
 4334010ad1201a607cd7cefa49e7cc5c *tests/testthat/data/test.bw
-a7ec70469d4cbb94ed72f95ad3a92f9f *tests/testthat/test-read.R
+3774f1675d094c74a6ab5e669dbdc62c *tests/testthat/data/test_noschema.bb
+2468144876b40111def167fa81cef14a *tests/testthat/test-read.R
