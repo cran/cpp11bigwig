@@ -3,10 +3,16 @@
 
 using namespace cpp11;
 
+#include <cmath>
 #include <sstream>
 #include <vector>
 
 #include "libBigWig/bigWig.h"
+// bwCommon.h (bwSetPos/bwRead, used to verify file magic) lacks extern "C"
+// guards, so declare its symbols with C linkage to match the C library.
+extern "C" {
+#include "libBigWig/bwCommon.h"
+}
 
 // R type categories for autoSql types
 enum class RType { Integer, Double, String };
@@ -64,6 +70,44 @@ std::vector<std::pair<std::string, std::string>> parse_autosql(const std::string
   return fields;
 }
 
+// Canonical UCSC BED fields (chrom, chromStart, chromEnd, then the bed4..bed12
+// columns), used as a fallback when a bigBed has no embedded autoSql schema.
+// Mirrors the standard bed12 autoSql so a schema-less file reads the same as one
+// encoded with `-as=bed12.as`. This naming is a cpp11bigwig convenience: UCSC's
+// `bigBedToBed -header`/`-tsv` instead aborts when a file has no autoSql rather
+// than inferring names, so read_bigbed() emits a message in that case. Sized to
+// the file header's field counts:
+// `field_count` is the total number of columns and `defined_field_count` is how
+// many of the fixed-format BED fields are present (3-12); any field beyond that
+// is a bedN+ extra column of unknown type and falls back to a generic string.
+std::vector<std::pair<std::string, std::string>> default_bed_fields(uint16_t field_count,
+                                                                    uint16_t defined_field_count) {
+  static const std::pair<const char*, const char*> bed_fields[] = {
+      {"chrom", "string"},
+      {"start", "uint"},
+      {"end", "uint"},
+      {"name", "string"},
+      {"score", "uint"},
+      {"strand", "char[1]"},
+      {"thickStart", "uint"},
+      {"thickEnd", "uint"},
+      {"itemRgb", "uint"},
+      {"blockCount", "int"},
+      {"blockSizes", "int[blockCount]"},
+      {"blockStarts", "int[blockCount]"}};
+
+  std::vector<std::pair<std::string, std::string>> fields;
+  for (uint16_t i = 0; i < field_count; ++i) {
+    if (i < defined_field_count && i < 12) {
+      fields.push_back({bed_fields[i].first, bed_fields[i].second});
+    } else {
+      // bedN+ extra field with unknown type: keep as string, generic name
+      fields.push_back({"field" + std::to_string(i + 1), "string"});
+    }
+  }
+  return fields;
+}
+
 // Split a string by delimiter
 std::vector<std::string> split_string(const std::string& str, char delim) {
   std::vector<std::string> tokens;
@@ -91,7 +135,8 @@ writable::list read_bigwig_cpp(std::string bwfname, strings chroms_r, integers s
   if (bwInit(1 << 17) != 0)
     stop("Failed to initialize libBigWig\n");
 
-  // NULL can be a CURL callback. see libBigWig demos
+  // 2nd arg is an optional curl-options callback; NULL uses libBigWig's
+  // defaults. Remote (http/https/ftp) URLs still work — see libBigWig demos.
   bwf = bwOpen(bwfile, NULL, "r");
 
   if (!bwf) {
@@ -184,7 +229,8 @@ writable::list read_bigbed_cpp(std::string bbfname, strings chroms_r, integers s
   if (bwInit(1 << 17) != 0)
     stop("Failed to initialize libBigWig\n");
 
-  // NULL can be a CURL callback. see libBigWig demos
+  // 2nd arg is an optional curl-options callback; NULL uses libBigWig's
+  // defaults. Remote (http/https/ftp) URLs still work — see libBigWig demos.
   bbf = bbOpen(bbfile, NULL);
 
   if (!bbf) {
@@ -200,6 +246,15 @@ writable::list read_bigbed_cpp(std::string bbfname, strings chroms_r, integers s
   free(sql);
 
   auto fields = parse_autosql(sql_str);
+
+  // Without an embedded schema (or on a partial parse) the field list comes up
+  // short of the layout recorded in the file header. Fall back to the canonical
+  // BED column names/types sized to the header counts so a schema-less bed12
+  // still yields all 12 columns instead of just chrom/start/end. A complete
+  // schema parses to exactly `fieldCount` entries and is never overridden.
+  if (fields.size() < bbf->hdr->fieldCount) {
+    fields = default_bed_fields(bbf->hdr->fieldCount, bbf->hdr->definedFieldCount);
+  }
 
   // Skip first 3 fields (chrom, chromStart, chromEnd) - handled separately
   size_t num_extra_fields = fields.size() > 3 ? fields.size() - 3 : 0;
@@ -342,6 +397,13 @@ writable::list read_bigbed_cpp(std::string bbfname, strings chroms_r, integers s
   bwClose(bbf);
   bwCleanup();
 
+  // Signal whether the file carried an embedded autoSql schema. sql_str is ""
+  // exactly when bbGetSQL() returned NULL (no schema), in which case the column
+  // names above came from the default_bed_fields() fallback rather than the
+  // file. read_bigbed() reads this off the returned list to emit a one-time
+  // message; it rides as an attribute so the C++ signature stays unchanged.
+  out.attr("has_autosql") = writable::logicals({r_bool(!sql_str.empty())});
+
   return out;
 }
 
@@ -355,7 +417,8 @@ std::string bigbed_sql_cpp(std::string bbfname) {
   if (bwInit(1 << 17) != 0)
     stop("Failed to initialize libBigWig\n");
 
-  // NULL can be a CURL callback. see libBigWig demos
+  // 2nd arg is an optional curl-options callback; NULL uses libBigWig's
+  // defaults. Remote (http/https/ftp) URLs still work — see libBigWig demos.
   bbf = bbOpen(bbfile, NULL);
 
   if (!bbf) {
@@ -373,6 +436,131 @@ std::string bigbed_sql_cpp(std::string bbfname) {
   bwCleanup();
 
   return (sql_str);
+}
+
+// Report header metadata for a bigBed file. `field_count` is the total number of
+// columns and `defined_field_count` is how many of the fixed-format BED columns
+// are present (3-12) -- the authoritative way to identify the BED variant (e.g.
+// `defined_field_count == 12` is a genuine BED12). `autosql` is the embedded
+// schema string (empty when the file has none).
+[[cpp11::register]]
+writable::list bigbed_info_cpp(std::string bbfname) {
+  const char* bbfile = bbfname.c_str();
+
+  // initialize libBigWig (allocates the read buffer required for remote files)
+  if (bwInit(1 << 17) != 0)
+    stop("Failed to initialize libBigWig\n");
+
+  // 2nd arg is an optional curl-options callback; NULL uses libBigWig's
+  // defaults. Remote (http/https/ftp) URLs still work — see libBigWig demos.
+  bigWigFile_t* bbf = bbOpen(bbfile, NULL);
+
+  if (!bbf) {
+    bwCleanup();
+    stop("Failed to open file: '%s'\n", bbfname.c_str());
+  }
+
+  // bbOpen() accepts either magic, so verify the file is really a bigBed by
+  // re-reading the magic from the open handle (avoids a second remote open)
+  uint32_t magic = 0;
+  if (bwSetPos(bbf, 0) != 0 || bwRead(&magic, sizeof(uint32_t), 1, bbf) != 1 ||
+      magic != BIGBED_MAGIC) {
+    bwClose(bbf);
+    bwCleanup();
+    stop("Not a bigBed file: '%s'\n", bbfname.c_str());
+  }
+
+  char* sql = bbGetSQL(bbf);
+  std::string sql_str(sql ? sql : "");
+  free(sql);
+
+  writable::list out;
+  writable::strings nms;
+
+  out.push_back(writable::integers({static_cast<int>(bbf->hdr->version)}));
+  nms.push_back("version");
+  out.push_back(writable::integers({static_cast<int>(bbf->cl->nKeys)}));
+  nms.push_back("n_chroms");
+  out.push_back(writable::integers({static_cast<int>(bbf->hdr->fieldCount)}));
+  nms.push_back("field_count");
+  out.push_back(writable::integers({static_cast<int>(bbf->hdr->definedFieldCount)}));
+  nms.push_back("defined_field_count");
+  out.push_back(writable::doubles({static_cast<double>(bbf->hdr->nBasesCovered)}));
+  nms.push_back("n_bases_covered");
+  out.push_back(writable::strings({sql_str}));
+  nms.push_back("autosql");
+
+  out.attr("names") = nms;
+
+  bwClose(bbf);
+  bwCleanup();
+
+  return out;
+}
+
+// Report header metadata and summary statistics for a bigWig file.
+[[cpp11::register]]
+writable::list bigwig_info_cpp(std::string bwfname) {
+  const char* bwfile = bwfname.c_str();
+
+  // initialize libBigWig (allocates the read buffer required for remote files)
+  if (bwInit(1 << 17) != 0)
+    stop("Failed to initialize libBigWig\n");
+
+  // 2nd arg is an optional curl-options callback; NULL uses libBigWig's
+  // defaults. Remote (http/https/ftp) URLs still work — see libBigWig demos.
+  bigWigFile_t* bw = bwOpen(bwfile, NULL, "r");
+
+  if (!bw) {
+    bwCleanup();
+    stop("Failed to open file: '%s'\n", bwfname.c_str());
+  }
+
+  // bwOpen() accepts either magic, so verify the file is really a bigWig by
+  // re-reading the magic from the open handle (avoids a second remote open)
+  uint32_t magic = 0;
+  if (bwSetPos(bw, 0) != 0 || bwRead(&magic, sizeof(uint32_t), 1, bw) != 1 ||
+      magic != BIGWIG_MAGIC) {
+    bwClose(bw);
+    bwCleanup();
+    stop("Not a bigWig file: '%s'\n", bwfname.c_str());
+  }
+
+  // file-level summary stats live in the header; derive mean/std from the sums
+  double nbases = static_cast<double>(bw->hdr->nBasesCovered);
+  double mean = nbases > 0 ? bw->hdr->sumData / nbases : NA_REAL;
+  double sd = NA_REAL;
+  if (nbases > 0) {
+    double var = (bw->hdr->sumSquared - bw->hdr->sumData * bw->hdr->sumData / nbases) / nbases;
+    sd = var > 0 ? std::sqrt(var) : 0.0;
+  }
+
+  writable::list out;
+  writable::strings nms;
+
+  out.push_back(writable::integers({static_cast<int>(bw->hdr->version)}));
+  nms.push_back("version");
+  out.push_back(writable::integers({static_cast<int>(bw->hdr->nLevels)}));
+  nms.push_back("n_levels");
+  out.push_back(writable::integers({static_cast<int>(bw->cl->nKeys)}));
+  nms.push_back("n_chroms");
+  out.push_back(writable::doubles({nbases}));
+  nms.push_back("n_bases_covered");
+  out.push_back(writable::doubles({bw->hdr->minVal}));
+  nms.push_back("min");
+  out.push_back(writable::doubles({bw->hdr->maxVal}));
+  nms.push_back("max");
+  out.push_back(writable::doubles({mean}));
+  nms.push_back("mean");
+  out.push_back(writable::doubles({sd}));
+  nms.push_back("std");
+
+  out.attr("names") = nms;
+
+  bwClose(bw);
+  bwCleanup();
+
+  return out;
 }
 
 // Report whether this build was compiled with libcurl (remote file) support.

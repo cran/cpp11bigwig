@@ -1,7 +1,7 @@
 Type: Package
 Package: cpp11bigwig
 Title: Read bigWig and bigBed Files
-Version: 0.3.0
+Version: 0.3.1
 Authors@R: c(
     person("Jay", "Hesselberth", , "jay.hesselberth@gmail.com", role = c("aut", "cre")),
     person("RNA Bioscience Initiative", role = c("fnd", "cph")),
@@ -25,10 +25,10 @@ Config/testthat/edition: 3
 Encoding: UTF-8
 Config/roxygen2/version: 8.0.0
 NeedsCompilation: yes
-Packaged: 2026-06-22 12:48:57 UTC; jayhesselberth
+Packaged: 2026-06-25 23:55:11 UTC; jayhesselberth
 Author: Jay Hesselberth [aut, cre],
   RNA Bioscience Initiative [fnd, cph],
   Devon Ryan [cph]
 Maintainer: Jay Hesselberth <jay.hesselberth@gmail.com>
 Repository: CRAN
-Date/Publication: 2026-06-22 14:20:02 UTC
+Date/Publication: 2026-06-26 08:00:08 UTC

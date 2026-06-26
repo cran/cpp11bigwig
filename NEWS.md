@@ -1,3 +1,21 @@
+# cpp11bigwig 0.3.1
+
+* New `bigbed_info()` and `bigwig_info()` report header metadata without reading
+  any intervals. `bigbed_info()` returns the field counts and embedded autoSql
+  schema, making it possible to identify the BED variant a file holds before
+  reading it (a genuine BED12 has `defined_field_count == 12`). `bigwig_info()`
+  returns the version, zoom levels, chromosome count, and file-level summary
+  statistics (`min`/`max`/`mean`/`std`).
+
+* `read_bigbed()` now returns all BED columns for files with no embedded autoSql
+  schema (e.g. a bed12 written by `bedToBigBed` without `-as`). Previously such
+  files returned only `chrom`/`start`/`end`; the reader now falls back to the
+  field counts in the file header and names columns with the standard BED field
+  names (any extra bedN+ fields become generic `fieldN` character columns)
+  (#18). When a file has no embedded schema, `read_bigbed()` now emits a
+  `message()` noting that the column names were inferred rather than declared
+  by the file; silence it with `suppressMessages()`.
+
 # cpp11bigwig 0.3.0
 
 * Fix a CRAN `gcc-san` (UBSan) `load of misaligned address` runtime error when

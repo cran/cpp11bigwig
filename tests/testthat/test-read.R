@@ -221,6 +221,42 @@ test_that("remote bigWig larger than the read buffer reads a windowed range (#18
   expect_equal(remote$value[1], 40)
 })
 
+test_that("remote bigwig_info matches local", {
+  skip_on_cran()
+  skip_if_not(bigwig_has_curl_cpp(), "built without libcurl")
+
+  url <- paste0(
+    "https://raw.githubusercontent.com/rnabioco/cpp11bigwig/",
+    "main/inst/extdata/test.bw"
+  )
+  local <- bigwig_info(system.file("extdata", "test.bw", package = "cpp11bigwig"))
+  # a network/remote-host failure should skip, not fail the suite
+  remote <- tryCatch(
+    bigwig_info(url),
+    error = function(e) skip(paste("remote fetch unavailable:", conditionMessage(e)))
+  )
+
+  expect_equal(remote, local)
+})
+
+test_that("remote bigbed_info matches local", {
+  skip_on_cran()
+  skip_if_not(bigwig_has_curl_cpp(), "built without libcurl")
+
+  url <- paste0(
+    "https://raw.githubusercontent.com/rnabioco/cpp11bigwig/",
+    "main/inst/extdata/test.bb"
+  )
+  local <- bigbed_info(system.file("extdata", "test.bb", package = "cpp11bigwig"))
+  # a network/remote-host failure should skip, not fail the suite
+  remote <- tryCatch(
+    bigbed_info(url),
+    error = function(e) skip(paste("remote fetch unavailable:", conditionMessage(e)))
+  )
+
+  expect_equal(remote, local)
+})
+
 test_that("read_bigbed correctly parses interval coordinates", {
   # Test with the sample bigBed file
   bb_file <- test_path("data/test.bb")
@@ -286,7 +322,7 @@ test_that("read_bigbed handles a bigBed with no embedded autoSql schema", {
   # R. test_noschema.bb is a bed3 file with its header sqlOffset zeroed.
   bb <- test_path("data/test_noschema.bb")
 
-  res <- read_bigbed(bb)
+  res <- suppressMessages(read_bigbed(bb))
   expect_s3_class(res, "tbl_df")
   # with no schema there are no extra typed fields: just chrom/start/end
   expect_equal(names(res), c("chrom", "start", "end"))
@@ -294,8 +330,50 @@ test_that("read_bigbed handles a bigBed with no embedded autoSql schema", {
   expect_true(all(res$end > res$start))
 
   # windowed / per-chrom queries still work without a schema
-  chr1 <- read_bigbed(bb, chrom = "chr1")
+  chr1 <- suppressMessages(read_bigbed(bb, chrom = "chr1"))
   expect_true(all(chr1$chrom == "chr1"))
+})
+
+test_that("read_bigbed recovers BED columns for a schema-less bed12", {
+  # A bed12 file written by `bedToBigBed` without `-as` has no autoSql schema
+  # but still stores 12 fields per record. The reader should fall back to the
+  # header's fieldCount/definedFieldCount and name the columns with the standard
+  # BED field names instead of dropping everything past chrom/start/end.
+  # test_noschema_bed12.bb is test.bb with its header sqlOffset zeroed.
+  noschema <- test_path("data/test_noschema_bed12.bb")
+  schema <- test_path("data/test.bb")
+
+  res <- suppressMessages(read_bigbed(noschema))
+  expect_s3_class(res, "tbl_df")
+  expect_equal(ncol(res), 12)
+  expect_equal(
+    names(res),
+    c(
+      "chrom", "start", "end", "name", "score", "strand",
+      "thickStart", "thickEnd", "itemRgb", "blockCount",
+      "blockSizes", "blockStarts"
+    )
+  )
+
+  # schema-less output should match the schema-backed file column-for-column,
+  # apart from the (schema-derived) column names
+  ref <- read_bigbed(schema)
+  expect_equal(nrow(res), nrow(ref))
+  expect_equal(unname(as.list(res)), unname(as.list(ref)))
+})
+
+test_that("read_bigbed messages when a bigBed has no autoSql, stays silent otherwise", {
+  # column names for a schema-less file are inferred, so the user is told
+  expect_message(
+    read_bigbed(test_path("data/test_noschema_bed12.bb")),
+    "autoSql"
+  )
+  expect_message(
+    read_bigbed(test_path("data/test_noschema.bb")),
+    "autoSql"
+  )
+  # a schema-backed file declares its own names: no message
+  expect_no_message(read_bigbed(test_path("data/test.bb")))
 })
 
 test_that("read_bigbed coerces columns based on autoSql types", {
@@ -329,4 +407,59 @@ test_that("read_bigbed coerces columns based on autoSql types", {
   expect_true(all(bb_data$blockCount > 0))
   expect_true(all(bb_data$thickStart >= bb_data$start))
   expect_true(all(bb_data$thickEnd <= bb_data$end))
+})
+
+test_that("bigbed_info reports header metadata and autoSql", {
+  info <- bigbed_info(test_path("data/test.bb"))
+
+  expect_named(
+    info,
+    c(
+      "version", "n_chroms", "field_count", "defined_field_count",
+      "n_bases_covered", "autosql"
+    )
+  )
+  # test.bb is a genuine BED12 with an embedded schema
+  expect_equal(info$field_count, 12L)
+  expect_equal(info$defined_field_count, 12L)
+  expect_gt(info$n_chroms, 0L)
+  expect_match(info$autosql, "blockSizes")
+})
+
+test_that("bigbed_info reads field counts from a schema-less bed12 header", {
+  # no embedded autoSql (sqlOffset zeroed) but the header still records 12 fields
+  info <- bigbed_info(test_path("data/test_noschema_bed12.bb"))
+
+  expect_equal(info$field_count, 12L)
+  expect_equal(info$defined_field_count, 12L)
+  expect_identical(info$autosql, "")
+})
+
+test_that("bigbed_info distinguishes a bed3 from a bed12", {
+  bed3 <- bigbed_info(test_path("data/test_noschema.bb"))
+  expect_equal(bed3$defined_field_count, 3L)
+})
+
+test_that("bigwig_info reports header metadata and summary stats", {
+  info <- bigwig_info(test_path("data/test.bw"))
+
+  expect_named(
+    info,
+    c(
+      "version", "n_levels", "n_chroms", "n_bases_covered",
+      "min", "max", "mean", "std"
+    )
+  )
+  expect_gt(info$n_chroms, 0L)
+  expect_gt(info$n_bases_covered, 0)
+  expect_true(info$max >= info$min)
+})
+
+test_that("info functions reject the wrong file type and missing files", {
+  bb <- test_path("data/test.bb")
+  bw <- test_path("data/test.bw")
+
+  expect_error(bigbed_info(bw), "Not a bigBed")
+  expect_error(bigwig_info(bb), "Not a bigWig")
+  expect_error(bigbed_info("does-not-exist.bb"), "does not exist")
 })
